@@ -1,0 +1,92 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  BINARY_NAME: check-outdated-deps
+  BUILD_DIR: bin
+  # Generate build info automatically
+  GIT_COMMIT:
+    sh: git rev-parse HEAD
+  BUILD_TIME:
+    sh: date -u +%Y-%m-%dT%H:%M:%SZ
+  # Get version from git tags, fallback to "dev"
+  GIT_VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+
+tasks:
+  build:
+    desc: Build the binary (development version)
+    cmd: go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}}
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  build:dev:
+    desc: Build with auto-generated version info
+    cmd: |
+      go build \
+          -ldflags "-X {{.BINARY_NAME}}/pkg/version.Version={{.GIT_VERSION}} \
+                    -X {{.BINARY_NAME}}/pkg/version.GitCommit={{.GIT_COMMIT}} \
+                    -X {{.BINARY_NAME}}/pkg/version.BuildTime={{.BUILD_TIME}}" \
+          -o {{.BUILD_DIR}}/{{.BINARY_NAME}}
+    sources:
+      - main.go
+      - internal/**/*.go
+      - pkg/**/*.go
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  build:release:
+    desc: Build with explicit version (requires VERSION env var)
+    preconditions:
+      - sh: '[ -n "$VERSION" ]'
+        msg: "VERSION environment variable is required. Usage: VERSION=v1.0.0 task build:release"
+    cmd: |
+      go build \
+        -ldflags "-X {{.BINARY_NAME}}/pkg/version.Version=$VERSION \
+                  -X {{.BINARY_NAME}}/pkg/version.GitCommit={{.GIT_COMMIT}} \
+                  -X {{.BINARY_NAME}}/pkg/version.BuildTime={{.BUILD_TIME}}" \
+        -o {{.BUILD_DIR}}/{{.BINARY_NAME}}
+    sources:
+      - main.go
+      - internal/**/*.go
+      - pkg/**/*.go
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  test:
+    cmd: go test -race ./...
+    sources:
+      - main.go
+      - internal/**/*.go
+      - pkg/**/*.go
+
+  test:coverage:
+    cmd: go test -race -coverprofile=coverage.txt ./...
+    sources:
+      - main.go
+      - internal/**/*.go
+      - pkg/**/*.go
+    generates:
+      - coverage.txt
+
+  version:
+    desc: Show version information that would be embedded
+    cmds:
+      - 'echo "Version: {{.GIT_VERSION}}"'
+      - 'echo "Commit: {{.GIT_COMMIT}}"'
+      - 'echo "Built: {{.BUILD_TIME}}"'
+
+  release:
+    desc: Tag a new release and build it
+    prompt: "This will create a git tag. Continue?"
+    preconditions:
+      - sh: '[ -n "$VERSION" ]'
+        msg: "VERSION environment variable is required. Usage: VERSION=v1.0.0 task release"
+      - sh: "git diff --quiet"
+        msg: "Working directory must be clean"
+    cmds:
+      - git tag {{.VERSION}}
+      - git push origin {{.VERSION}}
+      - task: build:release
+      - echo "Released {{.VERSION}}"

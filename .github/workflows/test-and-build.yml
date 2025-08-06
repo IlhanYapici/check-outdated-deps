@@ -1,0 +1,110 @@
+name: Test & Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: "1.24.5"
+  BUILD_DIR: "./bin"
+  BINARY_NAME: check-outdated-deps
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: task test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract branch name
+        id: extract_branch
+        shell: bash
+        run: |
+          echo "BRANCH_NAME=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> "$GITHUB_ENV"
+
+      - name: Get tag
+        id: get-tag
+        run: |
+          TAG=$(git tag --points-at HEAD)
+          if [ -n "$TAG" ]; then
+            echo "TAG=${TAG}" >> "$GITHUB_ENV"
+            echo "HAS_TAG=true" >> "$GITHUB_ENV"
+          else
+            echo "HAS_TAG=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Display warning (if needed)
+        run: |
+          if [ $BRANCH_NAME != "main" ]; then
+            echo "::warning::Currently not running on *main*. The binary will be a development build."
+          elif [ $HAS_TAG == 'false' ]; then
+            echo "::warning::No tag found for the current commit. The binary will be a development build."
+          fi
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Build application
+        run: |
+          if [ $BRANCH_NAME == "main" ] && [ $HAS_TAG == 'true' ]; then
+            # Building from a tag
+            VERSION=$TAG task build:release
+          else
+            # Building from branch
+            task build:dev
+          fi
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.BINARY_NAME}}
+          path: ${{env.BUILD_DIR}}/*
+          retention-days: ${{ env.BRANCH_NAME == 'main' && 30 || 7 }}
+          if-no-files-found: error
