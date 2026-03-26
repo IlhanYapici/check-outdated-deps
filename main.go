@@ -1,11 +1,6 @@
 package main
 
 import (
-	"check-outdated-deps/internal/config"
-	"check-outdated-deps/internal/parser"
-	"check-outdated-deps/internal/worker"
-	"check-outdated-deps/pkg/npm"
-	"check-outdated-deps/pkg/version"
 	"flag"
 	"fmt"
 	"log"
@@ -13,13 +8,21 @@ import (
 	"sort"
 	"sync/atomic"
 
+	"check-outdated-deps/internal/config"
+	"check-outdated-deps/internal/parser"
+	"check-outdated-deps/internal/worker"
+	"check-outdated-deps/pkg/npm"
+	"check-outdated-deps/pkg/version"
+
 	"github.com/fatih/color"
 	"github.com/pterm/pterm"
 	"github.com/rodaine/table"
 )
 
-var outdated int64
-var outdatedDev int64
+var (
+	outdated    int64
+	outdatedDev int64
+)
 
 func main() {
 	// Flags
@@ -34,16 +37,10 @@ func main() {
 	var dependencies npm.Dependencies
 	var devDependencies npm.DevDependencies
 
-	parsedFile, err := config.LoadPackageJson("package.json")
+	parsedFile, err := config.LoadPackageJSON("package.json")
 	if err != nil {
 		errMsg := fmt.Sprintf("error while loading package.json: %s", err)
 		log.Fatal(errMsg)
-	}
-
-	pkgManager, err := config.DeterminePackageManager("package.json", parsedFile)
-
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	for pkg, version := range parsedFile.Dependencies {
@@ -54,14 +51,7 @@ func main() {
 		devDependencies = append(devDependencies, npm.Package{Name: pkg, Version: parser.SanitizeVersion(version)})
 	}
 
-	pkgManagerExists := config.CheckPkgManagerExists(string(pkgManager))
-
-	if !pkgManagerExists {
-		errMessage := fmt.Sprintf("package manager '%s' not found", pkgManager)
-		log.Fatal(errMessage)
-	}
-
-	pool := worker.NewPool(pkgManager)
+	pool := worker.NewPool()
 
 	// TEST TABLE
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
@@ -75,7 +65,7 @@ func main() {
 
 	// Progress bar
 	fmt.Println()
-	p, _ := pterm.DefaultProgressbar.WithTotal(len(dependencies) + len(devDependencies)).WithTitle("Checkin latest versions").Start()
+	p, _ := pterm.DefaultProgressbar.WithTotal(len(dependencies) + len(devDependencies)).WithTitle("Checking latest versions").Start()
 
 	getProgressCallback := func(isDevDependency bool) func(pkgName, current, latest string, isOutdated bool, count int64) {
 		return func(pkgName, current, latest string, isOutdated bool, count int64) {
