@@ -1,6 +1,6 @@
 module check-outdated-deps
 
-go 1.24.5
+go 1.26.1
 
 require (
 	atomicgo.dev/cursor v0.2.0 // indirect
