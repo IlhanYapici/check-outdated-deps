@@ -1,32 +1,33 @@
 package worker
 
 import (
-	"check-outdated-deps/pkg/npm"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os/exec"
 	"runtime"
 	"sync"
 	"sync/atomic"
+
+	"check-outdated-deps/pkg/npm"
 )
 
 type Pool struct {
 	sem          chan bool
 	wg           sync.WaitGroup
 	currentCount *int64
-	pkgManager   npm.PackageManager
 }
 
 type ProgressCallback func(pkgName, current, latest string, isOutdated bool, count int64)
 
 var maxWorkers = runtime.NumCPU() * 2
 
-func NewPool(pkgManager npm.PackageManager) *Pool {
+func NewPool() *Pool {
 	return &Pool{
 		sem:          make(chan bool, maxWorkers),
 		currentCount: new(int64),
-		pkgManager:   pkgManager,
 	}
 }
 
@@ -65,7 +66,7 @@ func (p *Pool) GetCurrentCount() int64 {
 	return atomic.LoadInt64(p.currentCount)
 }
 
-// Resets the worker pool counters (useful for reusing the pool)
+// Reset resets the worker pool counters (useful for reusing the pool)
 func (p *Pool) Reset() {
 	atomic.StoreInt64(p.currentCount, 0)
 }
@@ -86,25 +87,20 @@ func (p *Pool) processPackage(pkg npm.Package) string {
 func (p *Pool) getPackageInfo(pkg npm.Package) (map[string]interface{}, error) {
 	var data map[string]interface{}
 
-	var output []byte
 	var err error
 
-	switch p.pkgManager {
-	case npm.NPM:
-		output, err = p.runCommand("npm", "info", pkg.Name, "--json")
-	case npm.YARN:
-		output, err = p.runCommand("yarn", "npm", "info", pkg.Name, "--json")
-	case npm.PNPM:
-		output, err = p.runCommand("pnpm", "info", pkg.Name, "--json")
-	default:
-		return nil, fmt.Errorf("unsupported package manager: %s", p.pkgManager)
-	}
-
+	res, err := http.Get(fmt.Sprintf("https://registry.npmjs.org/%s", pkg.Name))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get package info for %s: %w", pkg.Name, err)
 	}
 
-	err = json.Unmarshal(output, &data)
+	body, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response body for %s: %w", pkg.Name, err)
+	}
+
+	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse package info for %s: %w", pkg.Name, err)
 	}

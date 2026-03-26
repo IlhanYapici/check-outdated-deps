@@ -32,10 +32,8 @@ func SanitizeVersion(version string) string {
 	prefixes := []string{"^", "~", ">=", "<=", ">", "<", "="}
 
 	for _, prefix := range prefixes {
-		if strings.HasPrefix(version, prefix) {
-			version = strings.TrimPrefix(version, prefix)
-			break
-		}
+		sanitizedVersion, _ := strings.CutPrefix(version, prefix)
+		version = sanitizedVersion
 	}
 
 	return strings.TrimSpace(version)
