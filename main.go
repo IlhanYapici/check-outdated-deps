@@ -8,7 +8,6 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"check-outdated-deps/internal/config"
 	"check-outdated-deps/internal/npm"
 	"check-outdated-deps/internal/parser"
 	"check-outdated-deps/internal/version"
@@ -37,7 +36,7 @@ func main() {
 	var dependencies npm.Dependencies
 	var devDependencies npm.DevDependencies
 
-	parsedFile, err := config.LoadPackageJSON("package.json")
+	parsedFile, err := parser.LoadPackageJSON("package.json")
 	if err != nil {
 		errMsg := fmt.Sprintf("error while loading package.json: %s", err)
 		log.Fatal(errMsg)
