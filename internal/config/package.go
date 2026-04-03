@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"check-outdated-deps/pkg/npm"
+	"check-outdated-deps/internal/npm"
 )
 
 func LoadPackageJSON(filename string) (*npm.NpmPackageJSON, error) {

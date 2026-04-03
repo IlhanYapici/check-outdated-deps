@@ -11,7 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"check-outdated-deps/pkg/npm"
+	"check-outdated-deps/internal/npm"
 )
 
 type Pool struct {

@@ -25,9 +25,9 @@ tasks:
     desc: Build with auto-generated version info
     cmd: |
       go build \
-          -ldflags "-X {{.BINARY_NAME}}/pkg/version.Version={{.GIT_VERSION}} \
-                    -X {{.BINARY_NAME}}/pkg/version.GitCommit={{.GIT_COMMIT}} \
-                    -X {{.BINARY_NAME}}/pkg/version.BuildTime={{.BUILD_TIME}}" \
+          -ldflags "-X {{.BINARY_NAME}}/internal/version.Version={{.GIT_VERSION}} \
+                    -X {{.BINARY_NAME}}/internal/version.GitCommit={{.GIT_COMMIT}} \
+                    -X {{.BINARY_NAME}}/internal/version.BuildTime={{.BUILD_TIME}}" \
           -o {{.BUILD_DIR}}/{{.BINARY_NAME}}
     sources:
       - main.go
@@ -43,9 +43,9 @@ tasks:
         msg: "VERSION environment variable is required. Usage: VERSION=v1.0.0 task build:release"
     cmd: |
       go build \
-        -ldflags "-X {{.BINARY_NAME}}/pkg/version.Version=$VERSION \
-                  -X {{.BINARY_NAME}}/pkg/version.GitCommit={{.GIT_COMMIT}} \
-                  -X {{.BINARY_NAME}}/pkg/version.BuildTime={{.BUILD_TIME}}" \
+        -ldflags "-X {{.BINARY_NAME}}/internal/version.Version=$VERSION \
+                  -X {{.BINARY_NAME}}/internal/version.GitCommit={{.GIT_COMMIT}} \
+                  -X {{.BINARY_NAME}}/internal/version.BuildTime={{.BUILD_TIME}}" \
         -o {{.BUILD_DIR}}/{{.BINARY_NAME}}
     sources:
       - main.go
