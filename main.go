@@ -9,10 +9,10 @@ import (
 	"sync/atomic"
 
 	"check-outdated-deps/internal/config"
+	"check-outdated-deps/internal/npm"
 	"check-outdated-deps/internal/parser"
+	"check-outdated-deps/internal/version"
 	"check-outdated-deps/internal/worker"
-	"check-outdated-deps/pkg/npm"
-	"check-outdated-deps/pkg/version"
 
 	"github.com/fatih/color"
 	"github.com/pterm/pterm"
