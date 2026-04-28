@@ -6,6 +6,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	bolt "go.etcd.io/bbolt"
+
+	"check-outdated-deps/internal/cache"
 	"check-outdated-deps/internal/npm"
 )
 
@@ -14,17 +17,19 @@ type Pool struct {
 	wg           sync.WaitGroup
 	currentCount *int64
 	isVerbose    bool
+	db           *bolt.DB
 }
 
 type ProgressCallback func(pkgName, current, latest string, isOutdated bool, count int64)
 
 var maxWorkers = runtime.NumCPU() * 2
 
-func NewPool(isVerbose bool) *Pool {
+func NewPool(db *bolt.DB, isVerbose bool) *Pool {
 	return &Pool{
 		sem:          make(chan bool, maxWorkers),
 		currentCount: new(int64),
 		isVerbose:    isVerbose,
+		db:           db,
 	}
 }
 
@@ -60,6 +65,10 @@ func (p *Pool) Wait() {
 }
 
 func (p *Pool) processPackage(pkg npm.Package) string {
+	if version, isCached := cache.GetCachedVersion(p.db, pkg.Name); isCached {
+		return version
+	}
+
 	packageInfo, err := npm.GetPackageMetadata(pkg.Name)
 	if err != nil && p.isVerbose {
 		log.Printf("Error processing package %s: %v", pkg.Name, err)

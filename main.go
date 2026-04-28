@@ -8,6 +8,9 @@ import (
 	"sort"
 	"sync/atomic"
 
+	bolt "go.etcd.io/bbolt"
+
+	"check-outdated-deps/internal/cache"
 	"check-outdated-deps/internal/npm"
 	"check-outdated-deps/internal/parser"
 	"check-outdated-deps/internal/version"
@@ -58,7 +61,10 @@ func main() {
 		devDependencies = append(devDependencies, npm.Package{Name: pkg, Version: parser.SanitizeVersion(version)})
 	}
 
-	pool := worker.NewPool(*isVerbose)
+	DB_FILE_PATH := cache.GetDatabasePath()
+	db, _ := bolt.Open(DB_FILE_PATH, 0600, nil)
+	resultsChan := make(chan npm.Package, len(dependencies)+len(devDependencies))
+	pool := worker.NewPool(db, *isVerbose)
 
 	// TEST TABLE
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
@@ -78,6 +84,7 @@ func main() {
 		return func(pkgName, current, latest string, isOutdated bool, count int64) {
 			p.Increment()
 			formattedLatest := latest
+			resultsChan <- npm.Package{Name: pkgName, Version: latest}
 
 			if isOutdated {
 
@@ -101,6 +108,12 @@ func main() {
 
 	// Wait for goroutines to finish
 	pool.Wait()
+	close(resultsChan)
+
+	err = cache.SaveFromChannel(db, resultsChan)
+	if err != nil {
+		log.Fatalf("Cache error: %v", err)
+	}
 
 	sort.Slice(depRows, func(i, j int) bool {
 		return depRows[i][0] < depRows[j][0]
