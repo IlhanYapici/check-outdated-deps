@@ -26,7 +26,9 @@ var (
 func main() {
 	// Flags
 	showVersion := flag.Bool("version", false, "Show version")
+	isVerbose := flag.Bool("verbose", false, "Show detailed errors")
 	flag.Parse()
+	log.SetFlags(0)
 
 	if *showVersion {
 		fmt.Printf("Version: %s\nCommit: %s\nBuilt: %s\n", version.Version, version.GitCommit, version.BuildTime)
@@ -38,8 +40,14 @@ func main() {
 
 	parsedFile, err := parser.LoadPackageJSON("package.json")
 	if err != nil {
-		errMsg := fmt.Sprintf("error while loading package.json: %s", err)
+		errMsg := "package.json not found in current working directory."
+
+		if *isVerbose {
+			errMsg = fmt.Sprintf("error while loading package.json: %s", err)
+		}
+
 		log.Fatal(errMsg)
+		return
 	}
 
 	for pkg, version := range parsedFile.Dependencies {
@@ -50,7 +58,7 @@ func main() {
 		devDependencies = append(devDependencies, npm.Package{Name: pkg, Version: parser.SanitizeVersion(version)})
 	}
 
-	pool := worker.NewPool()
+	pool := worker.NewPool(*isVerbose)
 
 	// TEST TABLE
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()

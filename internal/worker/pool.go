@@ -13,16 +13,18 @@ type Pool struct {
 	sem          chan bool
 	wg           sync.WaitGroup
 	currentCount *int64
+	isVerbose    bool
 }
 
 type ProgressCallback func(pkgName, current, latest string, isOutdated bool, count int64)
 
 var maxWorkers = runtime.NumCPU() * 2
 
-func NewPool() *Pool {
+func NewPool(isVerbose bool) *Pool {
 	return &Pool{
 		sem:          make(chan bool, maxWorkers),
 		currentCount: new(int64),
+		isVerbose:    isVerbose,
 	}
 }
 
@@ -59,7 +61,7 @@ func (p *Pool) Wait() {
 
 func (p *Pool) processPackage(pkg npm.Package) string {
 	packageInfo, err := npm.GetPackageMetadata(pkg.Name)
-	if err != nil {
+	if err != nil && p.isVerbose {
 		log.Printf("Error processing package %s: %v", pkg.Name, err)
 	}
 
